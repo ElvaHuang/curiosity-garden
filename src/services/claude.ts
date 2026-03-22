@@ -9,7 +9,11 @@ let client: Anthropic | null = null;
 
 function getClient(): Anthropic {
   if (!client) {
-    client = new Anthropic();
+    client = new Anthropic({
+      apiKey: CONFIG.claude.apiKey,
+      baseURL: CONFIG.claude.baseURL,
+      dangerouslyAllowBrowser: true,
+    });
   }
   return client;
 }

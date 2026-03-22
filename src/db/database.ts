@@ -1,48 +1,62 @@
-import * as SQLite from 'expo-sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Seed, ConversationMessage, UserProfile } from '../types';
 
-let db: SQLite.SQLiteDatabase | null = null;
+const KEYS = {
+  user: 'cg_user',
+  seeds: 'cg_seeds',
+  messages: 'cg_messages',
+};
 
-export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (db) return db;
-  db = await SQLite.openDatabaseAsync('curiosity-garden.db');
-  await initializeDatabase(db);
-  return db;
+// ---- User ----
+
+export async function getUser(): Promise<UserProfile | null> {
+  const raw = await AsyncStorage.getItem(KEYS.user);
+  return raw ? JSON.parse(raw) : null;
 }
 
-async function initializeDatabase(database: SQLite.SQLiteDatabase): Promise<void> {
-  await database.execAsync(`
-    PRAGMA journal_mode = WAL;
+export async function saveUser(user: UserProfile): Promise<void> {
+  await AsyncStorage.setItem(KEYS.user, JSON.stringify(user));
+}
 
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      avatar_id TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
+// ---- Seeds ----
 
-    CREATE TABLE IF NOT EXISTS seeds (
-      id TEXT PRIMARY KEY,
-      question TEXT NOT NULL,
-      input_mode TEXT NOT NULL DEFAULT 'text',
-      photo_uri TEXT,
-      category TEXT NOT NULL,
-      growth_stage TEXT NOT NULL DEFAULT 'seed',
-      conversation_depth INTEGER NOT NULL DEFAULT 0,
-      garden_x REAL NOT NULL,
-      garden_y REAL NOT NULL,
-      created_at TEXT NOT NULL,
-      last_interacted_at TEXT NOT NULL
-    );
+export async function getAllSeeds(): Promise<Seed[]> {
+  const raw = await AsyncStorage.getItem(KEYS.seeds);
+  return raw ? JSON.parse(raw) : [];
+}
 
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      seed_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      timestamp TEXT NOT NULL,
-      FOREIGN KEY (seed_id) REFERENCES seeds(id)
-    );
+export async function saveSeed(seed: Seed): Promise<void> {
+  const seeds = await getAllSeeds();
+  seeds.unshift(seed);
+  await AsyncStorage.setItem(KEYS.seeds, JSON.stringify(seeds));
+}
 
-    CREATE INDEX IF NOT EXISTS idx_messages_seed_id ON messages(seed_id);
-  `);
+export async function updateSeedInStore(id: string, updates: Partial<Seed>): Promise<void> {
+  const seeds = await getAllSeeds();
+  const index = seeds.findIndex((s) => s.id === id);
+  if (index !== -1) {
+    seeds[index] = { ...seeds[index], ...updates };
+    await AsyncStorage.setItem(KEYS.seeds, JSON.stringify(seeds));
+  }
+}
+
+export async function getSeed(id: string): Promise<Seed | null> {
+  const seeds = await getAllSeeds();
+  return seeds.find((s) => s.id === id) ?? null;
+}
+
+// ---- Messages ----
+
+export async function getMessages(seedId: string): Promise<ConversationMessage[]> {
+  const raw = await AsyncStorage.getItem(`${KEYS.messages}_${seedId}`);
+  return raw ? JSON.parse(raw) : [];
+}
+
+export async function addMessage(
+  seedId: string,
+  message: ConversationMessage
+): Promise<void> {
+  const messages = await getMessages(seedId);
+  messages.push(message);
+  await AsyncStorage.setItem(`${KEYS.messages}_${seedId}`, JSON.stringify(messages));
 }

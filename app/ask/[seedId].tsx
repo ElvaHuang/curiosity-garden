@@ -16,7 +16,6 @@ import { ChatInput } from '../../src/components/chat/ChatInput';
 import { DepthIndicator } from '../../src/components/chat/DepthIndicator';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../src/constants/theme';
 import { PLANTS } from '../../src/constants/plants';
-import { getSeed } from '../../src/db/seeds';
 
 export default function ChatScreen() {
   const { seedId } = useLocalSearchParams<{ seedId: string }>();

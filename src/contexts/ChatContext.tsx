@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { v4 as uuid } from 'uuid';
 import { ConversationMessage, Seed } from '../types';
-import { addMessage, getMessages } from '../db/messages';
+import { getMessages, addMessage } from '../db/database';
 import { calculateDepth, getGrowthStage } from '../utils/growthStages';
 import { sendSocraticMessage } from '../services/claude';
 import { fetchWikipediaContext } from '../services/wikipedia';
@@ -29,10 +30,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const msgs = await getMessages(seed.id);
     setMessages(msgs);
 
-    // Fetch Wikipedia context if this is a new or early conversation
     if (msgs.length <= 2) {
-      const context = await fetchWikipediaContext(seed.question);
-      setWikipediaContext(context);
+      try {
+        const context = await fetchWikipediaContext(seed.question);
+        setWikipediaContext(context);
+      } catch {
+        // Wikipedia is optional
+      }
     }
   }, []);
 
@@ -41,16 +45,30 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     setIsLoading(true);
     try {
-      // Save user message
-      const userMsg = await addMessage(currentSeed.id, 'user', content);
+      // Create & save user message
+      const userMsg: ConversationMessage = {
+        id: uuid(),
+        seedId: currentSeed.id,
+        role: 'user',
+        content,
+        timestamp: new Date().toISOString(),
+      };
+      await addMessage(currentSeed.id, userMsg);
       const updatedMessages = [...messages, userMsg];
       setMessages(updatedMessages);
 
       // Get AI response
       const aiResponse = await sendSocraticMessage(updatedMessages, wikipediaContext);
 
-      // Save assistant message
-      const assistantMsg = await addMessage(currentSeed.id, 'assistant', aiResponse);
+      // Create & save assistant message
+      const assistantMsg: ConversationMessage = {
+        id: uuid(),
+        seedId: currentSeed.id,
+        role: 'assistant',
+        content: aiResponse,
+        timestamp: new Date().toISOString(),
+      };
+      await addMessage(currentSeed.id, assistantMsg);
       const allMessages = [...updatedMessages, assistantMsg];
       setMessages(allMessages);
 
@@ -63,12 +81,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Add error message so user knows something went wrong
-      const errorMsg = await addMessage(
-        currentSeed.id,
-        'assistant',
-        "Oops! I got a little confused there. Can you try saying that again? 🌿"
-      );
+      const errorMsg: ConversationMessage = {
+        id: uuid(),
+        seedId: currentSeed.id,
+        role: 'assistant',
+        content: "Oops! I got a little confused there. Can you try saying that again? 🌿",
+        timestamp: new Date().toISOString(),
+      };
+      await addMessage(currentSeed.id, errorMsg);
       setMessages((prev) => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);

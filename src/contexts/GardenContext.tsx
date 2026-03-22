@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
-import { Seed, UserProfile, PlantCategory } from '../types';
-import { getAllSeeds, createSeed, updateSeedGrowth } from '../db/seeds';
-import { getUser, createUser } from '../db/users';
-import { GrowthStage } from '../types';
+import { v4 as uuid } from 'uuid';
+import { Seed, UserProfile, PlantCategory, GrowthStage } from '../types';
+import { getAllSeeds, saveSeed, updateSeedInStore, getUser, saveUser } from '../db/database';
+import { assignGardenPosition } from '../utils/gardenLayout';
 
 interface GardenState {
   seeds: Seed[];
@@ -77,7 +77,20 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     category: PlantCategory,
     inputMode: 'text' | 'voice' | 'photo' = 'text'
   ): Promise<Seed> => {
-    const seed = await createSeed(question, category, inputMode, undefined, state.seeds.length);
+    const now = new Date().toISOString();
+    const position = assignGardenPosition(state.seeds.length);
+    const seed: Seed = {
+      id: uuid(),
+      question,
+      inputMode,
+      category,
+      growthStage: 'seed',
+      conversationDepth: 0,
+      gardenPosition: position,
+      createdAt: now,
+      lastInteractedAt: now,
+    };
+    await saveSeed(seed);
     dispatch({ type: 'ADD_SEED', seed });
     return seed;
   }, [state.seeds.length]);
@@ -87,12 +100,22 @@ export function GardenProvider({ children }: { children: React.ReactNode }) {
     growthStage: GrowthStage,
     depth: number
   ) => {
-    await updateSeedGrowth(seedId, growthStage, depth);
+    await updateSeedInStore(seedId, {
+      growthStage,
+      conversationDepth: depth,
+      lastInteractedAt: new Date().toISOString(),
+    });
     dispatch({ type: 'UPDATE_SEED', id: seedId, growthStage, depth });
   }, []);
 
   const setupUser = useCallback(async (name: string, avatarId: string) => {
-    const user = await createUser(name, avatarId);
+    const user: UserProfile = {
+      id: uuid(),
+      name,
+      avatarId,
+      createdAt: new Date().toISOString(),
+    };
+    await saveUser(user);
     dispatch({ type: 'SET_USER', user });
   }, []);
 
