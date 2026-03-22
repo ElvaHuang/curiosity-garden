@@ -1,0 +1,1 @@
+export const PHOTO_DESCRIBER_ADDITION = `The child just shared a photo with you. Describe what you see in simple, excited terms (1 sentence), then ask: "What do you wonder about this?" to help them form their curiosity into a question.`;
